@@ -2,7 +2,6 @@ import streamlit as st
 import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 import threading
-import time
 
 # Initialize state variables
 if 'meter_data' not in st.session_state:
@@ -39,7 +38,6 @@ def schedule_notifications():
     scheduler = BackgroundScheduler()
 
     def notify_usage():
-        st.session_state['meter_data']['last_notification'] = datetime.date.today()
         message = f"Reminder: Check EB meter readings. Current active meter: {st.session_state['meter_data']['active_meter']}"
         send_notification(message)
 
@@ -57,8 +55,8 @@ def generate_bill_action():
     meter1_reading = st.session_state['meter_data']['meter1_reading']
     meter2_reading = st.session_state['meter_data']['meter2_reading']
 
-    meter1_usage = meter1_reading - st.session_state['meter_data']['last_meter1_reading']
-    meter2_usage = meter2_reading - st.session_state['meter_data']['last_meter2_reading']
+    meter1_usage = meter1_reading - st.session_state['meter_data']['meter1_reading']
+    meter2_usage = meter2_reading - st.session_state['meter_data']['meter2_reading']
 
     total_usage = meter1_usage + meter2_usage
 
@@ -68,15 +66,15 @@ def generate_bill_action():
     bill_amount = calculate_bill(meter1_billable) + calculate_bill(meter2_billable)
 
     st.session_state['meter_data']['history'].append({
-        'date': last_bill_date,
+        'date': datetime.date.today(),
         'meter1_usage': meter1_usage,
         'meter2_usage': meter2_usage,
         'bill_amount': bill_amount
     })
 
     st.session_state['meter_data']['last_bill_date'] = datetime.date.today()
-    st.session_state['meter_data']['last_meter1_reading'] = meter1_reading
-    st.session_state['meter_data']['last_meter2_reading'] = meter2_reading
+    st.session_state['meter_data']['meter1_reading'] = meter1_reading
+    st.session_state['meter_data']['meter2_reading'] = meter2_reading
 
 # UI Layout
 st.title("TNEB Meter Usage Optimizer")

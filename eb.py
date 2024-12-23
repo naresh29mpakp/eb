@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import datetime
 from github import Github
+import io
 
 # GitHub credentials
-GITHUB_TOKEN = "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"  # Your token
+GITHUB_TOKEN = "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"  # Your valid token
 REPO_NAME = "naresh29mpakp/eb"  # Your repository name
 FILE_PATH = "meter_data.csv"  # Path to the file in the repo
 
@@ -16,9 +17,10 @@ repo = g.get_repo(REPO_NAME)
 try:
     contents = repo.get_contents(FILE_PATH)
     csv_data = contents.decoded_content.decode()
-    meter_data = pd.read_csv(pd.compat.StringIO(csv_data), parse_dates=["Date"])
+    meter_data = pd.read_csv(io.StringIO(csv_data), parse_dates=["Date"])
 except Exception as e:
     meter_data = pd.DataFrame(columns=["Date", "Meter 1 Reading", "Meter 2 Reading"])
+    contents = None  # No existing file
 
 # Initialize session state for readings
 if "meter_data" not in st.session_state:
@@ -47,11 +49,14 @@ if st.button("Add Reading"):
         st.session_state["meter_data"] = pd.concat([st.session_state["meter_data"], pd.DataFrame([new_data])], ignore_index=True)
         # Save data to GitHub
         csv_content = st.session_state["meter_data"].to_csv(index=False)
-        if contents:
-            repo.update_file(FILE_PATH, "Update meter data", csv_content, contents.sha)
-        else:
-            repo.create_file(FILE_PATH, "Create meter data file", csv_content)
-        st.success("Reading added successfully!")
+        try:
+            if contents:
+                repo.update_file(FILE_PATH, "Update meter data", csv_content, contents.sha)
+            else:
+                repo.create_file(FILE_PATH, "Create meter data file", csv_content)
+            st.success("Reading added successfully!")
+        except Exception as e:
+            st.error(f"Failed to save data to GitHub: {e}")
 
 # Display readings in a table
 if not st.session_state["meter_data"].empty:
@@ -83,10 +88,13 @@ else:
 
 # Refresh button to clear all data
 if st.button("Refresh Data"):
-    if contents:
-        repo.delete_file(FILE_PATH, "Clear all meter data", contents.sha)
-    st.session_state["meter_data"] = pd.DataFrame(columns=["Date", "Meter 1 Reading", "Meter 2 Reading"])
-    st.success("All data cleared!")
+    try:
+        if contents:
+            repo.delete_file(FILE_PATH, "Clear all meter data", contents.sha)
+        st.session_state["meter_data"] = pd.DataFrame(columns=["Date", "Meter 1 Reading", "Meter 2 Reading"])
+        st.success("All data cleared!")
+    except Exception as e:
+        st.error(f"Failed to clear data: {e}")
 
 # Footer
 st.sidebar.write("Persistent Meter Reading Tracker")

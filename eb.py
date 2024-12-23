@@ -1,15 +1,23 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import os
+from github import Github
 
-# File to store data
-DATA_FILE = "meter_data.csv"
+# GitHub credentials
+GITHUB_TOKEN = "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"  # Your token
+REPO_NAME = "naresh29mpakp/eb"  # Your repository name
+FILE_PATH = "meter_data.csv"  # Path to the file in the repo
 
-# Load existing data from CSV
-if os.path.exists(DATA_FILE):
-    meter_data = pd.read_csv(DATA_FILE, parse_dates=["Date"])
-else:
+# Initialize GitHub client
+g = Github(GITHUB_TOKEN)
+repo = g.get_repo(REPO_NAME)
+
+# Load existing data
+try:
+    contents = repo.get_contents(FILE_PATH)
+    csv_data = contents.decoded_content.decode()
+    meter_data = pd.read_csv(pd.compat.StringIO(csv_data), parse_dates=["Date"])
+except Exception as e:
     meter_data = pd.DataFrame(columns=["Date", "Meter 1 Reading", "Meter 2 Reading"])
 
 # Initialize session state for readings
@@ -18,7 +26,7 @@ if "meter_data" not in st.session_state:
 
 # Title and app description
 st.title("Persistent Meter Reading Tracker")
-st.write("Track and update your meter readings. Data is saved locally and persists between sessions.")
+st.write("Track and update your meter readings. Data is saved to GitHub and persists between sessions.")
 
 # Input fields
 st.header("Add New Reading")
@@ -37,7 +45,12 @@ if st.button("Add Reading"):
             "Meter 2 Reading": meter2_reading,
         }
         st.session_state["meter_data"] = pd.concat([st.session_state["meter_data"], pd.DataFrame([new_data])], ignore_index=True)
-        st.session_state["meter_data"].to_csv(DATA_FILE, index=False)  # Save to file
+        # Save data to GitHub
+        csv_content = st.session_state["meter_data"].to_csv(index=False)
+        if contents:
+            repo.update_file(FILE_PATH, "Update meter data", csv_content, contents.sha)
+        else:
+            repo.create_file(FILE_PATH, "Create meter data file", csv_content)
         st.success("Reading added successfully!")
 
 # Display readings in a table
@@ -70,8 +83,8 @@ else:
 
 # Refresh button to clear all data
 if st.button("Refresh Data"):
-    if os.path.exists(DATA_FILE):
-        os.remove(DATA_FILE)  # Delete the file to clear data
+    if contents:
+        repo.delete_file(FILE_PATH, "Clear all meter data", contents.sha)
     st.session_state["meter_data"] = pd.DataFrame(columns=["Date", "Meter 1 Reading", "Meter 2 Reading"])
     st.success("All data cleared!")
 
